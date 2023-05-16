@@ -1,0 +1,3 @@
+world world
+ALPHA_SCISSOR_THRESHOLD
+mwas
