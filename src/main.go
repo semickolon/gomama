@@ -103,11 +103,7 @@ func (m Model) View() string {
 	return m.changeList.View()
 }
 
-func Run(args []string) error {
-	regexStr := args[0]
-	subst := &args[1]
-	filenames := args[2:]
-
+func Run(regexStr string, subst *string, filenames []string) error {
 	regex, err := regexp2.Compile(regexStr, 0)
 	if err != nil {
 		return err
