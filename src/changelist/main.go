@@ -169,9 +169,9 @@ func (m Model) View() string {
 		return "\n  Initializing..."
 	}
 
-	borderColor := lipgloss.Color("#555")
+	borderColor := lipgloss.Color("#26233a")
 	if m.pagerFocused {
-		borderColor = lipgloss.Color("#0000ff")
+		borderColor = lipgloss.Color("#ebbcba")
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top,
@@ -180,6 +180,7 @@ func (m Model) View() string {
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(borderColor).
 			BorderLeft(true).
+			PaddingLeft(1).
 			Width(m.filePager.Width).
 			Render(m.filePager.View()),
 	)

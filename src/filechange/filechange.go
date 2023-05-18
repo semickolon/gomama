@@ -2,11 +2,11 @@ package filechange
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,7 +19,7 @@ type LineChange struct {
 	LineNo        int
 	Original      string
 	Replaced      *string
-	DiffPretty    string
+	Diffs         []diffmatchpatch.Diff
 	PreviewLineNo int
 	enabled       bool
 }
@@ -38,11 +38,56 @@ type PastHeadMsg struct{}
 type PastTailMsg struct{}
 
 var (
-	base            = lipgloss.NewStyle().Foreground(lipgloss.Color("#888"))
-	focused         = lipgloss.NewStyle().Background(lipgloss.Color("#0000ff"))
-	disabled        = lipgloss.NewStyle().Foreground(lipgloss.Color("#555")).Strikethrough(true)
-	focusedDisabled = lipgloss.NewStyle().Background(lipgloss.Color("#888")).Foreground(lipgloss.Color("#555")).Strikethrough(true)
+	base            = lipgloss.NewStyle().Foreground(lipgloss.Color("#e0def4"))
+	focused         = lipgloss.NewStyle().Background(lipgloss.Color("#524f67"))
+	disabled        = lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6a86"))
+	focusedDisabled = lipgloss.NewStyle().Background(lipgloss.Color("#6e6a86")).Foreground(lipgloss.Color("#444"))
+
+	diffInsert = lipgloss.NewStyle().Foreground(lipgloss.Color("#31748f"))
+	diffDelete = lipgloss.NewStyle().Foreground(lipgloss.Color("#eb6f92")).Strikethrough(true)
+	diffEqual  = lipgloss.NewStyle().Foreground(lipgloss.Color("#e0def4"))
+
+	diffDisabledInsert = lipgloss.NewStyle().Foreground(lipgloss.Color("#1b4251"))
+	diffDisabledDelete = lipgloss.NewStyle().Foreground(lipgloss.Color("#512632")).Strikethrough(true)
+	diffDisabledEqual  = lipgloss.NewStyle().Foreground(lipgloss.Color("#4a4a51"))
+
+	diffReview         = lipgloss.NewStyle().Foreground(lipgloss.Color("#c4a7e7"))
+	diffDisabledReview = lipgloss.NewStyle().Foreground(lipgloss.Color("#453a51"))
 )
+
+func DiffPrettyText(diffs []diffmatchpatch.Diff, enabled bool, reviewMode bool) string {
+	ternary := func(cond bool, a, b lipgloss.Style) lipgloss.Style {
+		if cond {
+			return a
+		} else {
+			return b
+		}
+	}
+
+	styleFor := func(diff diffmatchpatch.Diff) lipgloss.Style {
+
+		switch diff.Type {
+		case diffmatchpatch.DiffInsert:
+			return ternary(
+				enabled,
+				ternary(reviewMode, diffReview, diffInsert),
+				ternary(reviewMode, diffDisabledReview, diffDisabledInsert),
+			)
+		case diffmatchpatch.DiffDelete:
+			return ternary(enabled, diffDelete, diffDisabledDelete)
+		case diffmatchpatch.DiffEqual:
+			return ternary(enabled, diffEqual, diffDisabledEqual)
+		}
+		return diffDisabledEqual
+	}
+
+	var buff bytes.Buffer
+	for _, diff := range diffs {
+		buff.WriteString(styleFor(diff).Render(diff.Text))
+	}
+
+	return buff.String()
+}
 
 func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 	defer file.Close()
@@ -63,11 +108,24 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 			var change LineChange
 
 			if subst == nil {
-				diffPretty := line[:match.Index] + lipgloss.NewStyle().Foreground(lipgloss.Color("#0000ff")).Render(match.String()) + line[match.Index+match.Length:]
+				diffs := []diffmatchpatch.Diff{
+					{
+						Type: diffmatchpatch.DiffEqual,
+						Text: line[:match.Index],
+					},
+					{
+						Type: diffmatchpatch.DiffInsert,
+						Text: match.String(),
+					},
+					{
+						Type: diffmatchpatch.DiffEqual,
+						Text: line[match.Index+match.Length:],
+					},
+				}
 
-				preview = append(preview, ">"+diffPretty)
+				preview = append(preview, diffReview.Render(">")+DiffPrettyText(diffs, true, true))
 
-				change = LineChange{lineNo, line, nil, diffPretty, len(preview), true}
+				change = LineChange{lineNo, line, nil, diffs, len(preview), true}
 			} else {
 				replaced, err := regex.Replace(line, *subst, -1, -1)
 
@@ -77,12 +135,11 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 
 				dmp := diffmatchpatch.New()
 				diffs := dmp.DiffMain(line, replaced, false)
-				diffPretty := dmp.DiffPrettyText(diffs)
 
-				change = LineChange{lineNo, line, &replaced, diffPretty, len(preview), true}
+				change = LineChange{lineNo, line, &replaced, diffs, len(preview), true}
 
-				preview = append(preview, lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("-"+line))
-				preview = append(preview, lipgloss.NewStyle().Foreground(lipgloss.Color("#00ff00")).Render("+"+replaced))
+				preview = append(preview, lipgloss.NewStyle().Foreground(lipgloss.Color("#eb6f92")).Render("-"+line))
+				preview = append(preview, lipgloss.NewStyle().Foreground(lipgloss.Color("#31748f")).Render("+"+replaced))
 			}
 
 			lineChanges = append(lineChanges, &change)
@@ -228,10 +285,11 @@ func (m Model) View() string {
 	}
 
 	strs := make([]string, 0, m.GetHeight())
-	strs = append(strs, styleFor(0).Copy().Foreground(lipgloss.Color("#fff")).Bold(true).Render(m.filename))
+	strs = append(strs, styleFor(0).Copy().Bold(true).Render(m.filename))
 
 	for i, c := range m.lineChanges {
-		s := styleFor(i+1).Render(fmt.Sprintf("%4s: ", strconv.Itoa(c.LineNo))) + c.DiffPretty
+		style := styleFor(i + 1)
+		s := style.Render(fmt.Sprintf("%4d: ", c.LineNo)) + DiffPrettyText(c.Diffs, c.enabled, c.Replaced == nil)
 		strs = append(strs, s)
 	}
 
