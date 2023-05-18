@@ -153,10 +153,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.MoveCursor(1)
 		case "k":
 			m.MoveCursor(-1)
-		case "u":
-			m.MoveOneFile(false)
-		case "i":
+		case "pgup":
 			m.MoveOneFile(true)
+		case "pgdown":
+			m.MoveOneFile(false)
 		case "h":
 			m.pagerFocused = false
 		case "l":

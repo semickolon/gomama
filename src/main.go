@@ -8,19 +8,23 @@ import (
 	changelist "github.com/semickolon/gomama/src/changelist"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type ModelArgs struct {
-	regex     *regexp2.Regexp
-	subst     *string
-	filenames []string
-	w         int
-	h         int
+	regex       *regexp2.Regexp
+	subst       *string
+	filenames   []string
+	infoTitle   string
+	infoMessage string
+	w           int
+	h           int
 }
 
 type Model struct {
-	args       ModelArgs
-	changeList changelist.Model
+	args        ModelArgs
+	changeList  changelist.Model
+	showInfoBox bool
 }
 
 func New(args ModelArgs) (*Model, error) {
@@ -45,7 +49,7 @@ func New(args ModelArgs) (*Model, error) {
 		return nil, nil
 	}
 
-	return &Model{args, *changeList}, nil
+	return &Model{args, *changeList, false}, nil
 }
 
 func (m Model) Init() tea.Cmd {
@@ -69,6 +73,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
+		case "i":
+			if m.args.infoMessage != "" {
+				m.showInfoBox = !m.showInfoBox
+			}
 		case "r":
 			m.changeList.Replace()
 
@@ -93,23 +101,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	m.changeList, cmd = m.changeList.Update(msg)
-	cmds = append(cmds, cmd)
+	if !m.showInfoBox {
+		m.changeList, cmd = m.changeList.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return m, tea.Batch(cmds...)
 }
 
 func (m Model) View() string {
-	return m.changeList.View()
+	if m.showInfoBox {
+		infoText := m.args.infoMessage
+
+		if m.args.infoTitle != "" {
+			infoText = fmt.Sprintf("%s\n%s", lipgloss.NewStyle().Bold(true).Render(m.args.infoTitle), infoText)
+		}
+
+		info := lipgloss.NewStyle().
+			Border(lipgloss.ThickBorder()).
+			BorderForeground(lipgloss.Color("#ebbcba")).
+			PaddingLeft(1).
+			PaddingRight(1).
+			Width(m.args.w - 32).
+			Render(infoText)
+
+		return lipgloss.Place(m.args.w, m.args.h, lipgloss.Center, lipgloss.Center, info,
+			lipgloss.WithWhitespaceChars("i "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1f1d2e")))
+	} else {
+		return m.changeList.View()
+	}
 }
 
-func Run(regexStr string, subst *string, filenames []string) error {
+func Run(regexStr string, subst *string, filenames []string, infoTitle string, infoMessage string) error {
 	regex, err := regexp2.Compile(regexStr, 0)
 	if err != nil {
 		return err
 	}
 
-	m, err := New(ModelArgs{regex, subst, filenames, 0, 0})
+	m, err := New(ModelArgs{regex, subst, filenames, infoTitle, infoMessage, 0, 0})
 
 	if err != nil {
 		return err

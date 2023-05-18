@@ -30,18 +30,28 @@ func main() {
 				Usage:    "File(s) to match against",
 				Required: true,
 			},
+			&cli.StringFlag{
+				Name:  "info-title",
+				Usage: "Info title",
+			},
+			&cli.StringFlag{
+				Name:  "info-message",
+				Usage: "Info message",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			regexStr := ctx.String("regex")
 			var subst *string
 			filenames := ctx.StringSlice("file")
+			infoTitle := ctx.String("info-title")
+			infoMessage := ctx.String("info-message")
 
 			if ctx.IsSet("subst") {
 				s := ctx.String("subst")
 				subst = &s
 			}
 
-			return gomama.Run(regexStr, subst, filenames)
+			return gomama.Run(regexStr, subst, filenames, infoTitle, infoMessage)
 		},
 	}
 
