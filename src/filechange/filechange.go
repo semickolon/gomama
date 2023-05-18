@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -99,6 +100,17 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 	lines := []string{}
 	preview := []string{}
 
+	matchEvalMap := func(fn func(string) (string, error)) regexp2.MatchEvaluator {
+		return func(match regexp2.Match) string {
+			m := match.GroupByName("m")
+			str, err := fn(m.String())
+			if err != nil {
+				panic(err)
+			}
+			return match.String()[:m.Index-match.Index] + str + match.String()[m.Index-match.Index+m.Length:]
+		}
+	}
+
 	for scanner.Scan() {
 		lineNo += 1
 		line := scanner.Text()
@@ -127,10 +139,38 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 
 				change = LineChange{lineNo, line, nil, diffs, len(preview), true}
 			} else {
-				replaced, err := regex.Replace(line, *subst, -1, -1)
+				var replaced string
+				var err error
+
+				switch *subst {
+				case "$$++":
+					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
+						n, err := strconv.Atoi(m)
+						return strconv.Itoa(n + 1), err
+					}), -1, -1)
+				case "$$--":
+					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
+						n, err := strconv.Atoi(m)
+						return strconv.Itoa(n - 1), err
+					}), -1, -1)
+				case "$$~U":
+					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
+						return strings.ToUpper(m), nil
+					}), -1, -1)
+				case "$$~L":
+					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
+						return strings.ToLower(m), nil
+					}), -1, -1)
+				default:
+					replaced, err = regex.Replace(line, *subst, -1, -1)
+				}
 
 				if err != nil {
 					log.Fatal(err)
+				}
+
+				if line == replaced {
+					continue
 				}
 
 				dmp := diffmatchpatch.New()
