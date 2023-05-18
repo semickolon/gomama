@@ -180,8 +180,12 @@ func (m Model) Replace() {
 	f.Close()
 }
 
-func (m Model) OpenInEditor() {
-	exec.Command(os.Getenv("EDITOR"), m.filename).Output()
+func (m Model) OpenInEditor() tea.Cmd {
+	c := exec.Command(os.Getenv("EDITOR"), m.filename)
+	callback := func(err error) tea.Msg {
+		return tea.ClearScreen
+	}
+	return tea.ExecProcess(c, callback)
 }
 
 func (m Model) GetHeight() int {

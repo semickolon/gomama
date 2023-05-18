@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlclark/regexp2"
-	filechange "github.com/semickolon/gomama/src/filechange"
+	"github.com/semickolon/gomama/src/filechange"
 )
 
 type Model struct {
@@ -134,9 +134,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "l":
 			m.pagerFocused = true
 		case "e":
-			// TODO: Use tea.Exec
-			m.changes[m.selectedIdx].OpenInEditor()
-			return m, tea.ClearScreen
+			return m, m.changes[m.selectedIdx].OpenInEditor()
 		}
 
 	case tea.WindowSizeMsg:
