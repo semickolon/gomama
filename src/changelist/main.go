@@ -92,6 +92,34 @@ func (m *Model) MoveCursor(lines int) {
 	}
 }
 
+func (m *Model) MoveOneFile(up bool) {
+	newSelectedIdx := m.selectedIdx
+	if up {
+		newSelectedIdx--
+	} else {
+		newSelectedIdx++
+	}
+
+	newSelectedIdx = clamp(newSelectedIdx, 0, len(m.changes)-1)
+
+	if m.selectedIdx == newSelectedIdx {
+		return
+	}
+
+	c := m.GetCurrentChange()
+	if up {
+		c.MoveCursorToHead()
+		c.Cursor--
+	} else {
+		c.MoveCursorToTail()
+		c.Cursor++
+	}
+
+	m.selectedIdx = newSelectedIdx
+	c = m.GetCurrentChange()
+	c.MoveCursorToHead()
+}
+
 func (m *Model) UpdateViewport() {
 	m.viewport.SetContent(m.content())
 
@@ -126,9 +154,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "k":
 			m.MoveCursor(-1)
 		case "u":
-			m.MoveCursor(10)
+			m.MoveOneFile(false)
 		case "i":
-			m.MoveCursor(-10)
+			m.MoveOneFile(true)
 		case "h":
 			m.pagerFocused = false
 		case "l":
@@ -198,4 +226,14 @@ func (m Model) content() string {
 	}
 
 	return strings.Join(strs, "\n\n")
+}
+
+func clamp(value, min, max int) int {
+	if value < min {
+		return min
+	} else if value > max {
+		return max
+	} else {
+		return value
+	}
 }
