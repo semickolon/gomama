@@ -94,8 +94,8 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	lineNo := 0
 
+	lineNo := 0
 	lineChanges := []*LineChange{}
 	lines := []string{}
 	preview := []string{}
@@ -189,6 +189,9 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 	}
 
 	if len(lineChanges) > 0 {
+		// TODO: Last empty line is not returned. We add an empty line here to compensate.
+		//   Though this is unwanted behavior. We are just a find&replacer. Not a newline adder.
+		lines = append(lines, "")
 		return &Model{file.Name(), lineChanges, lines, -1, preview}, nil
 	}
 
@@ -196,12 +199,19 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 }
 
 func (m Model) Replace() {
+	replaceCount := 0
+
 	for _, c := range m.lineChanges {
 		if !c.enabled || c.Replaced == nil {
 			continue
 		}
 
 		m.lines[c.LineNo-1] = *c.Replaced
+		replaceCount++
+	}
+
+	if replaceCount == 0 {
+		return
 	}
 
 	f, err := os.OpenFile(m.filename, os.O_WRONLY, os.ModePerm)
