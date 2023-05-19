@@ -59,7 +59,6 @@ func (m Model) GetCurrentChange() *filechange.Model {
 
 func (m *Model) MoveCursor(lines int) {
 	if m.pagerFocused {
-		m.filePager.LineDown(lines)
 		return
 	}
 
@@ -93,6 +92,10 @@ func (m *Model) MoveCursor(lines int) {
 }
 
 func (m *Model) MoveOneFile(up bool) {
+	if m.pagerFocused {
+		return
+	}
+
 	newSelectedIdx := m.selectedIdx
 	if up {
 		newSelectedIdx--
@@ -178,14 +181,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
+	if m.pagerFocused {
+		m.filePager, cmd = m.filePager.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	m.changes[m.selectedIdx], cmd = m.changes[m.selectedIdx].Update(msg)
 	cmds = append(cmds, cmd)
 
 	m.UpdateViewport()
 	m.UpdateFilePager()
-
-	// m.viewport, cmd = m.viewport.Update(msg)
-	// cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
 }
