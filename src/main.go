@@ -133,12 +133,7 @@ func (m Model) View() string {
 	}
 }
 
-func Run(regexStr string, subst *string, filenames []string, infoTitle string, infoMessage string) error {
-	regex, err := regexp2.Compile(regexStr, 0)
-	if err != nil {
-		return err
-	}
-
+func Run(regex *regexp2.Regexp, subst *string, filenames []string, infoTitle string, infoMessage string) error {
 	m, err := New(ModelArgs{regex, subst, filenames, infoTitle, infoMessage, 0, 0})
 
 	if err != nil {

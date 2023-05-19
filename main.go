@@ -4,9 +4,33 @@ import (
 	"log"
 	"os"
 
+	"github.com/dlclark/regexp2"
 	gomama "github.com/semickolon/gomama/src"
+	"github.com/semickolon/gomama/src/replacer"
 	"github.com/urfave/cli/v2"
 )
+
+func headlessReplace(regex *regexp2.Regexp, subst string, filenames []string) error {
+	for _, fn := range filenames {
+		data, err := os.ReadFile(fn)
+		if err != nil {
+			return err
+		}
+
+		s := string(data)
+		s, err = replacer.Replace(s, regex, subst)
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(fn, []byte(s), 0666)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func main() {
 	app := &cli.App{
@@ -38,25 +62,42 @@ func main() {
 				Name:  "info-message",
 				Usage: "Info message",
 			},
+			&cli.BoolFlag{
+				Name:  "force",
+				Usage: "Apply all replacements immediately",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			regexStr := ctx.String("regex")
-			var subst *string
+			regex, err := regexp2.Compile(regexStr, 0)
+			if err != nil {
+				return err
+			}
+
 			filenames := ctx.StringSlice("file")
-			infoTitle := ctx.String("info-title")
-			infoMessage := ctx.String("info-message")
+			var subst *string
 
 			if ctx.IsSet("subst") {
 				s := ctx.String("subst")
 				subst = &s
 			}
 
-			return gomama.Run(regexStr, subst, filenames, infoTitle, infoMessage)
+			if ctx.Bool("force") {
+				if subst == nil {
+					log.Fatal("subst must be given if --force")
+				} else {
+					return headlessReplace(regex, *subst, filenames)
+				}
+			}
+
+			infoTitle := ctx.String("info-title")
+			infoMessage := ctx.String("info-message")
+
+			return gomama.Run(regex, subst, filenames, infoTitle, infoMessage)
 		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 }

@@ -7,12 +7,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlclark/regexp2"
+	replacer "github.com/semickolon/gomama/src/replacer"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
@@ -100,23 +100,12 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 	lines := []string{}
 	preview := []string{}
 
-	matchEvalMap := func(fn func(string) (string, error)) regexp2.MatchEvaluator {
-		return func(match regexp2.Match) string {
-			m := match.GroupByName("m")
-			str, err := fn(m.String())
-			if err != nil {
-				panic(err)
-			}
-			return match.String()[:m.Index-match.Index] + str + match.String()[m.Index-match.Index+m.Length:]
-		}
-	}
-
 	for scanner.Scan() {
 		lineNo += 1
 		line := scanner.Text()
 		lines = append(lines, line)
 
-		if match, _ := regex.FindStringMatch(line); match != nil {
+		if match, _ := replacer.Match(line, regex); match != nil {
 			var change LineChange
 
 			if subst == nil {
@@ -139,31 +128,7 @@ func New(file *os.File, regex *regexp2.Regexp, subst *string) (*Model, error) {
 
 				change = LineChange{lineNo, line, nil, diffs, len(preview), true}
 			} else {
-				var replaced string
-				var err error
-
-				switch *subst {
-				case "$$++":
-					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
-						n, err := strconv.Atoi(m)
-						return strconv.Itoa(n + 1), err
-					}), -1, -1)
-				case "$$--":
-					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
-						n, err := strconv.Atoi(m)
-						return strconv.Itoa(n - 1), err
-					}), -1, -1)
-				case "$$~U":
-					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
-						return strings.ToUpper(m), nil
-					}), -1, -1)
-				case "$$~L":
-					replaced, err = regex.ReplaceFunc(line, matchEvalMap(func(m string) (string, error) {
-						return strings.ToLower(m), nil
-					}), -1, -1)
-				default:
-					replaced, err = regex.Replace(line, *subst, -1, -1)
-				}
+				replaced, err := replacer.Replace(line, regex, *subst)
 
 				if err != nil {
 					log.Fatal(err)
