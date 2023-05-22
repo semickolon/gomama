@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlclark/regexp2"
+	"github.com/muesli/reflow/truncate"
 	replacer "github.com/semickolon/gomama/src/replacer"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -284,7 +285,7 @@ func (m *Model) SetLineChangesEnabled(enabled bool) {
 	}
 }
 
-func (m Model) View() string {
+func (m Model) View(width uint) string {
 	styleFor := func(idx int) lipgloss.Style {
 		enabled := m.IsItemEnabled(idx)
 
@@ -309,7 +310,7 @@ func (m Model) View() string {
 	for i, c := range m.lineChanges {
 		style := styleFor(i + 1)
 		s := style.Render(fmt.Sprintf("%4d: ", c.LineNo)) + DiffPrettyText(c.Diffs, c.enabled, c.Replaced == nil)
-		strs = append(strs, s)
+		strs = append(strs, truncate.String(s, width))
 	}
 
 	return strings.Join(strs, "\n")

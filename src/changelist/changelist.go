@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlclark/regexp2"
+	"github.com/muesli/reflow/truncate"
 	"github.com/semickolon/gomama/src/filechange"
 )
 
@@ -138,7 +139,14 @@ func (m *Model) UpdateViewport() {
 }
 
 func (m *Model) UpdateFilePager() {
-	m.filePager.SetContent(strings.Join(m.changes[m.selectedIdx].Preview, "\n"))
+	preview := m.GetCurrentChange().Preview
+	lines := make([]string, 0, len(preview))
+
+	for _, line := range preview {
+		lines = append(lines, truncate.String(line, uint(m.filePager.Width-2)))
+	}
+
+	m.filePager.SetContent(strings.Join(lines, "\n"))
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -227,7 +235,7 @@ func (m Model) content() string {
 	strs := make([]string, 0, len(m.changes))
 
 	for _, c := range m.changes {
-		strs = append(strs, c.View())
+		strs = append(strs, c.View(uint(m.viewport.Width)))
 	}
 
 	return strings.Join(strs, "\n\n")
