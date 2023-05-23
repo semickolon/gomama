@@ -63,6 +63,10 @@ func main() {
 				Usage: "Info message",
 			},
 			&cli.BoolFlag{
+				Name:  "skip-review",
+				Usage: "Skip review mode",
+			},
+			&cli.BoolFlag{
 				Name:  "force",
 				Usage: "Apply all replacements immediately",
 			},
@@ -92,8 +96,9 @@ func main() {
 
 			infoTitle := ctx.String("info-title")
 			infoMessage := ctx.String("info-message")
+			skipReview := ctx.Bool("skip-review")
 
-			return gomama.Run(regex, subst, filenames, infoTitle, infoMessage)
+			return gomama.Run(regex, subst, filenames, infoTitle, infoMessage, skipReview)
 		},
 	}
 

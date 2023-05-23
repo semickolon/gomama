@@ -17,6 +17,7 @@ type ModelArgs struct {
 	filenames   []string
 	infoTitle   string
 	infoMessage string
+	skipReview  bool
 	w           int
 	h           int
 }
@@ -80,7 +81,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.changeList.Replace()
 
-			if args.subst == nil {
+			if args.subst == nil || args.skipReview {
 				return m, tea.Quit // we are already in review mode, exit
 			} else {
 				args.subst = nil // review mode time
@@ -133,8 +134,8 @@ func (m Model) View() string {
 	}
 }
 
-func Run(regex *regexp2.Regexp, subst *string, filenames []string, infoTitle string, infoMessage string) error {
-	m, err := New(ModelArgs{regex, subst, filenames, infoTitle, infoMessage, 0, 0})
+func Run(regex *regexp2.Regexp, subst *string, filenames []string, infoTitle string, infoMessage string, skipReview bool) error {
+	m, err := New(ModelArgs{regex, subst, filenames, infoTitle, infoMessage, skipReview, 0, 0})
 
 	if err != nil {
 		return err
